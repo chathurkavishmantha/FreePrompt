@@ -24,3 +24,35 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Caption animations (preview). The active word span mounts with one of these. */
+.cap-pop {
+  display: inline-block;
+  animation: capPop 0.32s ease forwards;
+}
+.cap-bounce {
+  display: inline-block;
+  animation: capBounce 0.4s ease forwards;
+}
+@keyframes capPop {
+  0% {
+    transform: scale(1);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1.15);
+  }
+}
+@keyframes capBounce {
+  0% {
+    transform: translateY(-0.4em);
+  }
+  60% {
+    transform: translateY(0.05em);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}

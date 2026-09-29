@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(node_modules/**)",
+      "Read(.next/**)",
+      "Read(package-lock.json)",
+      "Read(**/*.jpg)",
+      "Read(**/*.png)",
+      "Read(**/*.mp4)",
+      "Read(**/*.mov)",
+      "Read(**/*.webm)"
+    ]
+  }
+}
