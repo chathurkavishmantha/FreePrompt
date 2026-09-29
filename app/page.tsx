@@ -9,6 +9,7 @@ import PromptOptionsForm from "@/components/PromptOptionsForm";
 import PromptResultView from "@/components/PromptResultView";
 import ManualMode from "@/components/ManualMode";
 import CaptionStudio from "@/components/CaptionStudio";
+import WatermarkStudio from "@/components/WatermarkStudio";
 import type {
   PromptOptions,
   PromptResult,
@@ -17,7 +18,7 @@ import type {
 
 type Step = 1 | 2 | 3;
 type Mode = "manual" | "auto";
-type Tool = "prompt" | "captions";
+type Tool = "prompt" | "captions" | "watermark";
 
 export default function Home() {
   const [tool, setTool] = useState<Tool>("prompt");
@@ -138,7 +139,7 @@ export default function Home() {
 
           {/* Tool tabs */}
           <div className="inline-flex w-fit rounded-lg border border-neutral-800 bg-neutral-900 p-1">
-            {(["prompt", "captions"] as const).map((t) => (
+            {(["prompt", "captions", "watermark"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -149,7 +150,11 @@ export default function Home() {
                     : "text-neutral-300 hover:text-neutral-100"
                 }`}
               >
-                {t === "prompt" ? "Video prompt" : "Auto captions"}
+                {t === "prompt"
+                  ? "Video prompt"
+                  : t === "captions"
+                    ? "Auto captions"
+                    : "Remove watermark"}
               </button>
             ))}
           </div>
@@ -187,6 +192,8 @@ export default function Home() {
         </header>
 
         {tool === "captions" && <CaptionStudio />}
+
+        {tool === "watermark" && <WatermarkStudio />}
 
         {tool === "prompt" && error && (
           <p className="text-sm text-red-400">{error}</p>

@@ -17,6 +17,12 @@ get an editable scene description, then generate a cinematic AI video prompt.
   burned in** (MediaRecorder records an offscreen canvas + audio, in real time).
   Shared draw/timing helpers live in `lib/captions.ts`. Orchestrated by
   `components/CaptionStudio.tsx`.
+- **Remove watermark** — hide a logo/watermark by drawing a box or brush mask
+  over it and covering it with blur / pixelate / clone-nearby. Fully in-browser,
+  no key: `lib/watermark.ts` composites a masked replacement onto each canvas
+  frame; `components/WatermarkStudio.tsx` handles drawing, live preview, and a
+  burned-in **.webm** export (MediaRecorder). Obscures the region — not true AI
+  reconstruction.
 
 ## Video prompt modes
 

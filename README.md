@@ -55,6 +55,10 @@ Tabs at the top switch between:
   modes and 3-step flow described below).
 - **Auto captions** — add animated word-by-word (karaoke) captions to a video
   that already has a voice-over. See below.
+- **Remove watermark** — draw a box or brush over a watermark/logo and cover it
+  with blur, pixelate, or clone-nearby, then export a cleaned `.webm`. Runs in the
+  browser (no key). It obscures the spot rather than perfectly reconstructing
+  what's behind it; for a watermark that moves between corners, cover each spot.
 
 ## Auto captions (free, in-browser)
 
@@ -123,13 +127,14 @@ app/
   api/prompt/route.ts   POST: description + options → PromptResult
 components/             Uploader, FramePreview, StepIndicator, ManualMode,
                         DescriptionForm, PromptOptionsForm, PromptResultView,
-                        CaptionStudio, CaptionPlayer
+                        CaptionStudio, CaptionPlayer, WatermarkStudio
 lib/
   imageResize.ts        browser image resize → JPEG data URL
   extractFrames.ts      browser video → 20 frames
   extractAudio.ts       browser video → 16 kHz mono PCM (for captions)
   whisper.worker.ts     in-browser Whisper (word timestamps), no API key
   captions.ts           caption line-grouping + canvas draw (preview + export)
+  watermark.ts          masked blur/pixelate/clone frame compositing
   manualInstructions.ts builds the paste-into-chat instruction (free mode)
   gemini.ts             server-only Google Gemini client + model id
   parseJson.ts          tolerant JSON parsing of model output
