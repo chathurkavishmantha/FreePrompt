@@ -5,6 +5,7 @@ import {
   drawProcessedFrame,
   makeScratch,
   type RemovalMethod,
+  type RemovalOptions,
   type WatermarkScratch,
 } from "@/lib/watermark";
 
@@ -13,9 +14,17 @@ const MAX_VIDEO_BYTES = 300 * 1024 * 1024; // 300 MB
 type DrawMode = "rect" | "brush" | "erase";
 
 const METHODS: { id: RemovalMethod; name: string }[] = [
+  { id: "clone", name: "Clone nearby" },
   { id: "blur", name: "Blur" },
   { id: "pixelate", name: "Pixelate" },
-  { id: "clone", name: "Clone nearby" },
+];
+
+// Where the clone method samples clean pixels from (fraction of frame size).
+const SAMPLE_DIRS: { id: string; name: string; ox: number; oy: number }[] = [
+  { id: "left", name: "← Left", ox: -0.12, oy: 0 },
+  { id: "right", name: "Right →", ox: 0.12, oy: 0 },
+  { id: "up", name: "↑ Up", ox: 0, oy: -0.12 },
+  { id: "down", name: "↓ Down", ox: 0, oy: 0.12 },
 ];
 
 const MODES: { id: DrawMode; name: string }[] = [
@@ -48,9 +57,12 @@ export default function WatermarkStudio() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<DrawMode>("rect");
-  const [method, setMethod] = useState<RemovalMethod>("blur");
+  const [method, setMethod] = useState<RemovalMethod>("clone");
   const [strength, setStrength] = useState(60);
   const [brushSize, setBrushSize] = useState(48);
+  const [sampleDir, setSampleDir] = useState("left");
+  const [sampleDist, setSampleDist] = useState(12); // % of frame size
+  const [feather, setFeather] = useState(12); // px soft edge
   const [hasMask, setHasMask] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -66,10 +78,29 @@ export default function WatermarkStudio() {
   const inputRef = useRef<HTMLInputElement>(null);
   const maskRef = useRef<HTMLCanvasElement | null>(null);
   const scratchRef = useRef<WatermarkScratch | null>(null);
+  const dims = useRef({ w: 0, h: 0 });
 
   // Latest control values for the render loop to read without restarting it.
-  const cfg = useRef({ method, strength });
-  cfg.current = { method, strength };
+  const cfg = useRef<RemovalOptions>({
+    method,
+    strength,
+    offsetX: 0,
+    offsetY: 0,
+    feather,
+  });
+  {
+    const dir = SAMPLE_DIRS.find((d) => d.id === sampleDir);
+    const sign = dir ? Math.sign(dir.ox || dir.oy) : 0;
+    const horiz = dir ? dir.ox !== 0 : true;
+    const frac = (sampleDist / 100) * sign;
+    cfg.current = {
+      method,
+      strength,
+      offsetX: method === "clone" && horiz ? frac : 0,
+      offsetY: method === "clone" && !horiz ? frac : 0,
+      feather,
+    };
+  }
 
   // Interaction state (refs so pointer handlers see current values).
   const drag = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -105,12 +136,10 @@ export default function WatermarkStudio() {
 
   function onLoadedMetadata() {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    const w = video.videoWidth;
-    const h = video.videoHeight;
-    canvas.width = w;
-    canvas.height = h;
+    if (!video) return;
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 360;
+    dims.current = { w, h };
 
     const mask = document.createElement("canvas");
     mask.width = w;
@@ -119,6 +148,8 @@ export default function WatermarkStudio() {
     scratchRef.current = makeScratch();
 
     setDuration(video.duration);
+    // The canvas is mounted once `ready` is true; the render-loop effect below
+    // sizes it. (Don't gate this on canvasRef — it isn't in the DOM yet.)
     setReady(true);
   }
 
@@ -133,6 +164,11 @@ export default function WatermarkStudio() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Size the visible canvas now that it's mounted (onLoadedMetadata can't —
+    // the canvas isn't in the DOM until `ready` flips true).
+    canvas.width = dims.current.w;
+    canvas.height = dims.current.h;
+
     let raf = 0;
     let lastT = -1;
     const tick = () => {
@@ -142,8 +178,7 @@ export default function WatermarkStudio() {
         canvas.height,
         video,
         mask,
-        cfg.current.method,
-        cfg.current.strength,
+        cfg.current,
         scratch
       );
       const d = drag.current;
@@ -308,8 +343,7 @@ export default function WatermarkStudio() {
           canvas.height,
           video,
           mask,
-          cfg.current.method,
-          cfg.current.strength,
+          cfg.current,
           scratch
         );
         if (dur > 0)
@@ -358,10 +392,14 @@ export default function WatermarkStudio() {
         Hide a watermark or logo (CapCut, TikTok, Dola, etc.). Pick a video, then{" "}
         <strong className="text-neutral-200">draw a box or brush</strong> over the
         watermark and choose how to cover it. Everything runs{" "}
-        <strong className="text-neutral-200">free in your browser</strong>. This
-        obscures the spot (blur / pixelate / clone) rather than perfectly
-        reconstructing what&apos;s behind it. For a watermark that moves between
-        corners, cover each spot.
+        <strong className="text-neutral-200">free in your browser</strong>.{" "}
+        <strong className="text-neutral-200">Best result:</strong> use{" "}
+        <strong className="text-neutral-200">Clone nearby</strong>, set{" "}
+        <em>Sample clean pixels from</em> a direction with matching texture (e.g.
+        the flat area beside the logo), and raise <em>Edge blend</em> so the patch
+        melts in. This covers the spot rather than perfectly reconstructing
+        what&apos;s behind it. For a watermark that moves between corners, cover
+        each spot.
       </div>
 
       <div>
@@ -476,17 +514,70 @@ export default function WatermarkStudio() {
               ))}
             </div>
 
+            {method === "clone" ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mr-1 text-sm text-neutral-400">
+                    Sample clean pixels from
+                  </span>
+                  {SAMPLE_DIRS.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setSampleDir(d.id)}
+                      className={`rounded-md border px-3 py-1 text-sm transition-colors ${
+                        sampleDir === d.id
+                          ? "border-neutral-100 bg-neutral-100 text-neutral-900"
+                          : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+                      }`}
+                    >
+                      {d.name}
+                    </button>
+                  ))}
+                </div>
+                <label className="flex items-center gap-3 text-sm text-neutral-400">
+                  Sample distance
+                  <input
+                    type="range"
+                    min={2}
+                    max={40}
+                    value={sampleDist}
+                    onChange={(e) => setSampleDist(Number(e.target.value))}
+                    className="flex-1 accent-neutral-100"
+                  />
+                  <span className="w-10 text-right text-neutral-200">
+                    {sampleDist}%
+                  </span>
+                </label>
+              </>
+            ) : (
+              <label className="flex items-center gap-3 text-sm text-neutral-400">
+                Strength
+                <input
+                  type="range"
+                  min={10}
+                  max={100}
+                  value={strength}
+                  onChange={(e) => setStrength(Number(e.target.value))}
+                  className="flex-1 accent-neutral-100"
+                />
+                <span className="w-8 text-right text-neutral-200">
+                  {strength}
+                </span>
+              </label>
+            )}
+
             <label className="flex items-center gap-3 text-sm text-neutral-400">
-              Strength
+              Edge blend
               <input
                 type="range"
-                min={10}
-                max={100}
-                value={strength}
-                onChange={(e) => setStrength(Number(e.target.value))}
+                min={0}
+                max={60}
+                value={feather}
+                onChange={(e) => setFeather(Number(e.target.value))}
                 className="flex-1 accent-neutral-100"
               />
-              <span className="w-8 text-right text-neutral-200">{strength}</span>
+              <span className="w-10 text-right text-neutral-200">{feather}px</span>
             </label>
 
             {mode !== "rect" && (
